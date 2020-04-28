@@ -330,6 +330,70 @@ def DB_to_amplitude(
     return ref * torch.pow(torch.pow(10.0, 0.1 * x), power)
 
 
+def _hz_to_mel(freq: Tensor, htk: bool = True) -> Tensor:
+    r"""Convert Hz to Mels
+
+    Args:
+        freqs (Tensor): Frequencies in Hz
+        htk (bool): Use HTK formula instead of Slaney
+
+    Returns:
+        mels (Tensor): Input frequencies in Mels
+    """
+
+    if htk:
+        # print(2595.0 * math.log10(1.0 + (freq / 700.0)), 2595.0 * torch.log10(1.0 + (torch.tensor(freq) / 700.0)))
+        # return 2595.0 * math.log10(1.0 + (freq / 700.0))
+        return 2595.0 * torch.log10(1.0 + (freq / 700.0))
+
+    # Fill in the linear part
+    f_min = 0.0
+    f_sp = 200.0 / 3
+
+    mels = (freq - f_min) / f_sp
+
+    # Fill in the log-scale part
+
+    min_log_hz = 1000.0  # beginning of log region (Hz)
+    min_log_mel = (min_log_hz - f_min) / f_sp  # same (Mels)
+    logstep = math.log(6.4) / 27.0  # step size for log region
+
+    log_t = freq >= min_log_hz
+    mels[log_t] = min_log_mel + torch.log(freq[log_t] / min_log_hz) / logstep
+
+    return mels
+
+
+def _mel_to_hz(mels: Tensor, htk: bool = True) -> Tensor:
+    """Convert mel bin numbers to frequencies
+
+    Args:
+        mels (Tensor): Mel frequencies
+        htk (bool): Use HTK formula instead of Slaney
+
+    Returns:
+        freqs (Tensor): Mels converted in Hz
+    """
+
+    if htk:
+        return 700.0 * (10.0**(mels / 2595.0) - 1.0)
+
+    # Fill in the linear scale
+    f_min = 0.0
+    f_sp = 200.0 / 3
+    freqs = f_min + f_sp * mels
+
+    # And now the nonlinear scale
+    min_log_hz = 1000.0  # beginning of log region (Hz)
+    min_log_mel = (min_log_hz - f_min) / f_sp  # same (Mels)
+    logstep = math.log(6.4) / 27.0  # step size for log region
+
+    log_t = (mels >= min_log_mel)
+    freqs[log_t] = min_log_hz * torch.exp(logstep * (mels[log_t] - min_log_mel))
+
+    return freqs
+
+
 def create_fb_matrix(
         n_freqs: int,
         f_min: float,
@@ -337,6 +401,7 @@ def create_fb_matrix(
         n_mels: int,
         sample_rate: int,
         norm: str = "",
+        htk: bool = True,
 ) -> Tensor:
     r"""Create a frequency bin conversion matrix.
 
@@ -348,6 +413,7 @@ def create_fb_matrix(
         sample_rate (int): Sample rate of the audio waveform
         norm (str): If 'slaney', divide the triangular mel weights by the width of the mel band
         (area normalization). (Default: '')
+        htk (bool): Use HTK formula instead of Slaney
 
     Returns:
         Tensor: Triangular filter banks (fb matrix) of size (``n_freqs``, ``n_mels``)
@@ -361,12 +427,13 @@ def create_fb_matrix(
     all_freqs = torch.linspace(0, sample_rate // 2, n_freqs)
 
     # calculate mel freq bins
-    # hertz to mel(f) is 2595. * math.log10(1. + (f / 700.))
-    m_min = 2595.0 * math.log10(1.0 + (f_min / 700.0))
-    m_max = 2595.0 * math.log10(1.0 + (f_max / 700.0))
+    f_min = torch.tensor(f_min, dtype=torch.float64)
+    f_max = torch.tensor(f_max, dtype=torch.float64)
+    m_min = _hz_to_mel(f_min)
+    m_max = _hz_to_mel(f_max)
     m_pts = torch.linspace(m_min, m_max, n_mels + 2)
-    # mel to hertz(mel) is 700. * (10**(mel / 2595.) - 1.)
-    f_pts = 700.0 * (10 ** (m_pts / 2595.0) - 1.0)
+
+    f_pts = _mel_to_hz(m_pts)
     # calculate the difference between each mel point and each stft freq point in hertz
     f_diff = f_pts[1:] - f_pts[:-1]  # (n_mels + 1)
     slopes = f_pts.unsqueeze(0) - all_freqs.unsqueeze(1)  # (n_freqs, n_mels + 2)
