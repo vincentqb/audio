@@ -427,8 +427,6 @@ def create_fb_matrix(
     all_freqs = torch.linspace(0, sample_rate // 2, n_freqs)
 
     # calculate mel freq bins
-    f_min = torch.tensor(f_min, dtype=torch.float64)
-    f_max = torch.tensor(f_max, dtype=torch.float64)
     m_min = _hz_to_mel(f_min)
     m_max = _hz_to_mel(f_max)
     m_pts = torch.linspace(m_min, m_max, n_mels + 2)
