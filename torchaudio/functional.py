@@ -342,8 +342,6 @@ def _hz_to_mel(freq: Tensor, htk: bool = True) -> Tensor:
     """
 
     if htk:
-        # print(2595.0 * math.log10(1.0 + (freq / 700.0)), 2595.0 * torch.log10(1.0 + (torch.tensor(freq) / 700.0)))
-        # return 2595.0 * math.log10(1.0 + (freq / 700.0))
         return 2595.0 * torch.log10(1.0 + (freq / 700.0))
 
     # Fill in the linear part
@@ -353,10 +351,9 @@ def _hz_to_mel(freq: Tensor, htk: bool = True) -> Tensor:
     mels = (freq - f_min) / f_sp
 
     # Fill in the log-scale part
-
-    min_log_hz = 1000.0  # beginning of log region (Hz)
-    min_log_mel = (min_log_hz - f_min) / f_sp  # same (Mels)
-    logstep = math.log(6.4) / 27.0  # step size for log region
+    min_log_hz = 1000.0
+    min_log_mel = (min_log_hz - f_min) / f_sp
+    logstep = math.log(6.4) / 27.0
 
     log_t = freq >= min_log_hz
     mels[log_t] = min_log_mel + torch.log(freq[log_t] / min_log_hz) / logstep
@@ -384,9 +381,9 @@ def _mel_to_hz(mels: Tensor, htk: bool = True) -> Tensor:
     freqs = f_min + f_sp * mels
 
     # And now the nonlinear scale
-    min_log_hz = 1000.0  # beginning of log region (Hz)
-    min_log_mel = (min_log_hz - f_min) / f_sp  # same (Mels)
-    logstep = math.log(6.4) / 27.0  # step size for log region
+    min_log_hz = 1000.0
+    min_log_mel = (min_log_hz - f_min) / f_sp
+    logstep = math.log(6.4) / 27.0
 
     log_t = (mels >= min_log_mel)
     freqs[log_t] = min_log_hz * torch.exp(logstep * (mels[log_t] - min_log_mel))
