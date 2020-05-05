@@ -330,35 +330,40 @@ def DB_to_amplitude(
     return ref * torch.pow(torch.pow(10.0, 0.1 * x), power)
 
 
-def _hz_to_mel(freq: Tensor, htk: bool = True) -> Tensor:
+def _hz_to_mel(freq: Tensor, mel_scale: str = "htk") -> Tensor:
     r"""Convert Hz to Mels
 
     Args:
         freqs (Tensor): Frequencies in Hz
-        htk (bool): Use HTK formula instead of Slaney
+        mel_scale (str, optional): Scale to use: ``htk`` or ``slaney``. (Default: ``htk``)
 
     Returns:
         mels (Tensor): Input frequencies in Mels
     """
 
-    if htk:
-        return 2595.0 * torch.log10(1.0 + (freq / 700.0))
+    assert mel_scale in ("htk", "slaney")
 
-    # Fill in the linear part
-    f_min = 0.0
-    f_sp = 200.0 / 3
+    if mel_scale == "htk":
+        return 2595.0 * torch.log10(torch.tensor(1.0 + (freq / 700.0), dtype=torch.float64))
+    elif mel_scale == "slaney":
 
-    mels = (freq - f_min) / f_sp
+        # Fill in the linear part
+        f_min = 0.0
+        f_sp = 200.0 / 3
 
-    # Fill in the log-scale part
-    min_log_hz = 1000.0
-    min_log_mel = (min_log_hz - f_min) / f_sp
-    logstep = math.log(6.4) / 27.0
+        mels = (freq - f_min) / f_sp
 
-    log_t = freq >= min_log_hz
-    mels[log_t] = min_log_mel + torch.log(freq[log_t] / min_log_hz) / logstep
+        # Fill in the log-scale part
+        min_log_hz = 1000.0
+        min_log_mel = (min_log_hz - f_min) / f_sp
+        logstep = math.log(6.4) / 27.0
 
-    return mels
+        log_t = freq >= min_log_hz
+        mels[log_t] = min_log_mel + torch.log(torch.tensor(freq[log_t] / min_log_hz, dtype=torch.float64)) / logstep
+
+        return mels
+    else:
+        raise ValueError('mel_scale should be one of "htk" or "slaney".')
 
 
 def _mel_to_hz(mels: Tensor, htk: bool = True) -> Tensor:
