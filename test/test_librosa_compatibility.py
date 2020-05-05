@@ -53,13 +53,13 @@ class TestFunctional(_LibrosaMixin, unittest.TestCase):
 
         torch.testing.assert_allclose(ta_out, lr_out, atol=5e-5, rtol=1e-5)
 
-    def _test_create_fb(self, n_mels=40, sample_rate=22050, n_fft=2048, fmin=0.0, fmax=8000.0, norm=None, htk=True):
+    def _test_create_fb(self, n_mels=40, sample_rate=22050, n_fft=2048, fmin=0.0, fmax=8000.0, norm=None, mel_scale="htk"):
         librosa_fb = librosa.filters.mel(sr=sample_rate,
                                          n_fft=n_fft,
                                          n_mels=n_mels,
                                          fmax=fmax,
                                          fmin=fmin,
-                                         htk=htk,
+                                         htk=mel_scale == "htk",
                                          norm=None)
         fb = F.create_fb_matrix(sample_rate=sample_rate,
                                 n_mels=n_mels,
@@ -67,7 +67,7 @@ class TestFunctional(_LibrosaMixin, unittest.TestCase):
                                 f_min=fmin,
                                 n_freqs=(n_fft // 2 + 1),
                                 norm=norm,
-                                htk=htk)
+                                mel_scale=mel_scale)
 
         for i_mel_bank in range(n_mels):
             torch.testing.assert_allclose(fb[:, i_mel_bank], torch.tensor(librosa_fb[i_mel_bank]),
@@ -87,13 +87,13 @@ class TestFunctional(_LibrosaMixin, unittest.TestCase):
         self._test_create_fb(n_mels=56, fmin=800.0, fmax=900.0, norm="slaney")
         self._test_create_fb(n_mels=56, fmin=1900.0, fmax=900.0, norm="slaney")
         self._test_create_fb(n_mels=10, fmin=1900.0, fmax=900.0, norm="slaney")
-        self._test_create_fb(htk=False)
-        self._test_create_fb(n_mels=128, sample_rate=44100, htk=False)
-        self._test_create_fb(n_mels=128, fmin=2000.0, fmax=5000.0, htk=False)
-        self._test_create_fb(n_mels=56, fmin=100.0, fmax=9000.0, htk=False)
-        self._test_create_fb(n_mels=56, fmin=800.0, fmax=900.0, htk=False)
-        self._test_create_fb(n_mels=56, fmin=1900.0, fmax=900.0, htk=False)
-        self._test_create_fb(n_mels=10, fmin=1900.0, fmax=900.0, htk=False)
+        self._test_create_fb(mel_scale="slaney")
+        self._test_create_fb(n_mels=128, sample_rate=44100, mel_scale="slaney")
+        self._test_create_fb(n_mels=128, fmin=2000.0, fmax=5000.0, mel_scale="slaney")
+        self._test_create_fb(n_mels=56, fmin=100.0, fmax=9000.0, mel_scale="slaney")
+        self._test_create_fb(n_mels=56, fmin=800.0, fmax=900.0, mel_scale="slaney")
+        self._test_create_fb(n_mels=56, fmin=1900.0, fmax=900.0, mel_scale="slaney")
+        self._test_create_fb(n_mels=10, fmin=1900.0, fmax=900.0, mel_scale="slaney")
 
     def test_amplitude_to_DB(self):
         spec = torch.rand((6, 201))
