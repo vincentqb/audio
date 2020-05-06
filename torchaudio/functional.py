@@ -341,27 +341,27 @@ def _hz_to_mel(freq: Tensor, mel_scale: str = "htk") -> Tensor:
         mels (Tensor): Input frequencies in Mels
     """
 
+    if mel_scale not in ['slaney', 'htk']:
+        raise ValueError('mel_scale should be one of "htk" or "slaney".')
+
     if mel_scale == "htk":
         return 2595.0 * torch.log10(torch.tensor(1.0 + (freq / 700.0), dtype=torch.float64))
-    elif mel_scale == "slaney":
 
-        # Fill in the linear part
-        f_min = 0.0
-        f_sp = 200.0 / 3
+    # Fill in the linear part
+    f_min = 0.0
+    f_sp = 200.0 / 3
 
-        mels = (freq - f_min) / f_sp
+    mels = (freq - f_min) / f_sp
 
-        # Fill in the log-scale part
-        min_log_hz = 1000.0
-        min_log_mel = (min_log_hz - f_min) / f_sp
-        logstep = math.log(6.4) / 27.0
+    # Fill in the log-scale part
+    min_log_hz = 1000.0
+    min_log_mel = (min_log_hz - f_min) / f_sp
+    logstep = math.log(6.4) / 27.0
 
-        log_t = freq >= min_log_hz
-        mels[log_t] = min_log_mel + torch.log(torch.tensor(freq[log_t] / min_log_hz, dtype=torch.float64)) / logstep
+    log_t = freq >= min_log_hz
+    mels[log_t] = min_log_mel + torch.log(torch.tensor(freq[log_t] / min_log_hz, dtype=torch.float64)) / logstep
 
-        return mels
-    else:
-        raise ValueError('mel_scale should be one of "htk" or "slaney".')
+    return mels
 
 
 def _mel_to_hz(mels: Tensor, mel_scale: str = "htk") -> Tensor:
@@ -375,26 +375,26 @@ def _mel_to_hz(mels: Tensor, mel_scale: str = "htk") -> Tensor:
         freqs (Tensor): Mels converted in Hz
     """
 
+    if mel_scale not in ['slaney', 'htk']:
+        raise ValueError('mel_scale should be one of "htk" or "slaney".')
+
     if mel_scale == "htk":
         return 700.0 * (10.0**(mels / 2595.0) - 1.0)
-    elif mel_scale == "slaney":
 
-        # Fill in the linear scale
-        f_min = 0.0
-        f_sp = 200.0 / 3
-        freqs = f_min + f_sp * mels
+    # Fill in the linear scale
+    f_min = 0.0
+    f_sp = 200.0 / 3
+    freqs = f_min + f_sp * mels
 
-        # And now the nonlinear scale
-        min_log_hz = 1000.0
-        min_log_mel = (min_log_hz - f_min) / f_sp
-        logstep = math.log(6.4) / 27.0
+    # And now the nonlinear scale
+    min_log_hz = 1000.0
+    min_log_mel = (min_log_hz - f_min) / f_sp
+    logstep = math.log(6.4) / 27.0
 
-        log_t = (mels >= min_log_mel)
-        freqs[log_t] = min_log_hz * torch.exp(logstep * (mels[log_t] - min_log_mel))
+    log_t = (mels >= min_log_mel)
+    freqs[log_t] = min_log_hz * torch.exp(logstep * (mels[log_t] - min_log_mel))
 
-        return freqs
-    else:
-        raise ValueError('mel_scale should be one of "htk" or "slaney".')
+    return freqs
 
 
 def create_fb_matrix(
@@ -406,7 +406,7 @@ def create_fb_matrix(
         norm: str = "",
         mel_scale: str = "htk",
 ) -> Tensor:
-    r"""Create a frequency bin conversion matrix.
+    r"""Create a frequency bin conversion matrix with dtype=float32.
 
     Args:
         n_freqs (int): Number of frequencies to highlight/apply
@@ -429,15 +429,18 @@ def create_fb_matrix(
     # Equivalent filterbank construction by Librosa
     all_freqs = torch.linspace(0, sample_rate // 2, n_freqs)
 
-    # calculate mel freq bins
+    # torch.log10 with float32 produces different results on different CPUs
     m_min = _hz_to_mel(torch.tensor(f_min, dtype=torch.float64), mel_scale=mel_scale)
     m_max = _hz_to_mel(torch.tensor(f_max, dtype=torch.float64), mel_scale=mel_scale)
-    m_pts = torch.linspace(m_min, m_max, n_mels + 2)
 
+    # calculate mel freq bins
+    m_pts = torch.linspace(m_min, m_max, n_mels + 2)
     f_pts = _mel_to_hz(m_pts, mel_scale=mel_scale)
+
     # calculate the difference between each mel point and each stft freq point in hertz
     f_diff = f_pts[1:] - f_pts[:-1]  # (n_mels + 1)
     slopes = f_pts.unsqueeze(0) - all_freqs.unsqueeze(1)  # (n_freqs, n_mels + 2)
+
     # create overlapping triangles
     zero = torch.zeros(1)
     down_slopes = (-1.0 * slopes[:, :-2]) / f_diff[:-1]  # (n_freqs, n_mels)
@@ -449,7 +452,7 @@ def create_fb_matrix(
         enorm = 2.0 / (f_pts[2:n_mels + 2] - f_pts[:n_mels])
         fb *= enorm.unsqueeze(0)
 
-    return fb
+    return fb.type(torch.float32)
 
 
 def create_dct(
