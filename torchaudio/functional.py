@@ -452,7 +452,7 @@ def create_fb_matrix(
         enorm = 2.0 / (f_pts[2:n_mels + 2] - f_pts[:n_mels])
         fb *= enorm.unsqueeze(0)
 
-    return fb.type(torch.float32)
+    return fb.to(torch.float32)
 
 
 def create_dct(
