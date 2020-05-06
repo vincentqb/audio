@@ -406,7 +406,7 @@ def create_fb_matrix(
         norm: str = "",
         mel_scale: str = "htk",
 ) -> Tensor:
-    r"""Create a frequency bin conversion matrix with dtype=float32.
+    r"""Create a frequency bin conversion matrix of float32 dtype.
 
     Args:
         n_freqs (int): Number of frequencies to highlight/apply
