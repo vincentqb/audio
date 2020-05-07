@@ -345,7 +345,7 @@ def _hz_to_mel(freq: Tensor, mel_scale: str = "htk") -> Tensor:
         raise ValueError('mel_scale should be one of "htk" or "slaney".')
 
     if mel_scale == "htk":
-        return 2595.0 * torch.log10(1.0 + (freq / 700.0))
+        return 2595.0 * torch.log10((700.0 + freq) / 700.0)
 
     # Fill in the linear part
     f_min = 0.0
@@ -429,9 +429,9 @@ def create_fb_matrix(
     # Equivalent filterbank construction by Librosa
     all_freqs = torch.linspace(0, sample_rate // 2, n_freqs)
 
-    # torch.log10 with float32 produces different results on different CPUs
-    m_min = _hz_to_mel(torch.tensor(f_min, dtype=torch.float64), mel_scale=mel_scale)
-    m_max = _hz_to_mel(torch.tensor(f_max, dtype=torch.float64), mel_scale=mel_scale)
+    # convert hz to mel
+    m_min = _hz_to_mel(torch.tensor(f_min), mel_scale=mel_scale)
+    m_max = _hz_to_mel(torch.tensor(f_max), mel_scale=mel_scale)
 
     # calculate mel freq bins
     m_pts = torch.linspace(m_min, m_max, n_mels + 2)
@@ -452,7 +452,7 @@ def create_fb_matrix(
         enorm = 2.0 / (f_pts[2:n_mels + 2] - f_pts[:n_mels])
         fb *= enorm.unsqueeze(0)
 
-    return fb.to(torch.float32)
+    return fb
 
 
 def create_dct(
